@@ -410,6 +410,7 @@ async function pollCamStats() {
       ["decode failures", s.decodeFailures],
     ]);
     $("camLapseBtn").disabled = s.recordedFrames === 0;
+    renderLapseStatus(s);
     // reflect recording state driven from anywhere (a capture run starts it too)
     camRecording = s.recording;
     $("camRecBtn").textContent = s.recording
@@ -445,11 +446,52 @@ $("camCopyBtn").onclick = async () => {
 
 let camRecording = false;
 
+// ------------------------------------------------------------ timelapse
+
+let lapseFpm = 10;
+
+document.querySelectorAll("#lapseRates .rate").forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll("#lapseRates .rate").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    $("lapseCustom").value = "";
+    lapseFpm = parseFloat(b.dataset.fpm);
+    logTrace(`timelapse rate: ${lapseFpm}/min`);
+  };
+});
+
+$("lapseCustom").onchange = () => {
+  let v = parseFloat($("lapseCustom").value);
+  if (!isFinite(v)) return;
+  // hard cap 60/min; floor 1/min
+  v = Math.min(60, Math.max(1, v));
+  $("lapseCustom").value = v;
+  document.querySelectorAll("#lapseRates .rate").forEach((x) => x.classList.remove("active"));
+  lapseFpm = v;
+  logTrace(`timelapse rate: ${lapseFpm}/min (custom)`);
+};
+
+function renderLapseStatus(s) {
+  if (!s || !s.connected) {
+    $("lapseStatus").textContent = "idle - camera not connected";
+    return;
+  }
+  if (!s.recording) {
+    $("lapseStatus").textContent = s.recordedFrames
+      ? `stopped - ${s.recordedFrames} frames held, ~${(s.recordedFrames / 25).toFixed(1)}s of video @25fps`
+      : "idle";
+    return;
+  }
+  const rate = s.lapseRateFpm > 0 ? `${s.lapseRateFpm.toFixed(0)}/min` : "every keyframe";
+  $("lapseStatus").textContent =
+    `● REC ${s.recordedFrames} frames @ ${rate} - ~${(s.recordedFrames / 25).toFixed(1)}s of video @25fps`;
+}
+
 $("camRecBtn").onclick = async () => {
   const on = !camRecording;
   logTrace(`click: Record -> ${on}`);
   try {
-    const held = await invoke("camera_record", { on });
+    const held = await invoke("camera_record", { on, rateFpm: on ? lapseFpm : null });
     log(on ? "camera: recording started (previous frames discarded)"
            : `camera: recording stopped, ${held} frames held`);
     await pollCamStats();
@@ -497,7 +539,7 @@ $("camLive").onchange = async () => {
 };
 
 $("camLapseBtn").onclick = async () => {
-  logTrace("click: Export MP4");
+  logTrace("click: Render timelapse");
   try {
     const r = await invoke("camera_write_timelapse", { fps: 25 });
     log(`timelapse: ${r}`);
@@ -1143,6 +1185,17 @@ async function calRefreshState() {
   }
 }
 
+async function refreshVisionChip() {
+  try {
+    const s = await invoke("vision_camera_status");
+    $("visionChip").textContent = s.calibrated ? "calibrated" : "not calibrated";
+    $("visionChip").style.color = s.calibrated ? "var(--good)" : "var(--bad)";
+  } catch (_) {
+    $("visionChip").textContent = "unknown";
+  }
+}
+refreshVisionChip();
+
 $("calModalBtn").onclick = () => {
   logTrace("click: Camera calibration");
   $("calModal").style.display = "block";
@@ -1219,9 +1272,38 @@ $("camImg").addEventListener("click", async (ev) => {
     log(`calibration: ${res}`);
     $("calModal").style.display = "block";
     calRefreshState();
+    refreshVisionChip();
   } catch (e) {
     logError(`calibration: ${e}`);
     $("calModal").style.display = "block";
     calRefreshState();
   }
 });
+
+// ------------------------------------------------------------ verdict
+
+$("verdictBtn").onclick = async () => {
+  logTrace("click: Compute verdict");
+  try {
+    const v = await invoke("verdict_compute", {
+      revs: parseInt($("revs").value, 10) || 4,
+      marginRungs: parseInt($("verdictMargin").value, 10),
+    });
+    $("verdictHead").textContent = v.recommendation != null
+      ? `recommended filament_max_volumetric_speed = ${v.recommendation}`
+      : "no usable ceiling from this run";
+    $("verdictHead").style.color = v.recommendation != null ? "var(--good)" : "var(--warn)";
+    $("verdictBody").innerHTML = v.temps
+      .map((t) => {
+        const temp = t.temp != null ? `${t.temp} °C` : `cylinder ${t.cylinder}`;
+        return `<div>${temp}: ${t.sentence || "no judged bands"}</div>`;
+      })
+      .join("");
+    $("verdictFlags").innerHTML = (v.runFlags || [])
+      .map((f) => `<div>⚑ ${f}</div>`)
+      .join("");
+    log(`verdict: ${v.temps.length} cylinders judged, ${(v.runFlags || []).length} flags`);
+  } catch (e) {
+    logError(`verdict: ${e}`);
+  }
+};

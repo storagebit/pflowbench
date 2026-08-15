@@ -26,6 +26,19 @@ Everything runs through a desktop app: G-code generation, upload over
 PrusaLink, live capture with force/knee charts, per-band camera stills,
 timelapse recording, and a unified console.
 
+## Timelapse
+
+Prusa printers ship without any timelapse function; this app provides one,
+independent of the calibration bench. With the printer's camera connected:
+
+- capture at 1, 2, 5 or 10 frames per minute (or custom, capped at 60 --
+  the camera publishes a keyframe about every 3 s, the physical maximum)
+- live status while recording: frame count and resulting video length
+- one click renders the frames to MP4 and opens it in your default player
+- bench runs record automatically, so every calibration print has a video
+
+Recording works during any print job, not just bench runs.
+
 ## Requirements
 
 - A Nextruder-based Prusa printer running Buddy firmware, reachable over

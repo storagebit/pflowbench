@@ -15,8 +15,10 @@ mod capture;
 mod parse;
 mod sdmap;
 mod stats;
+mod verdict;
 
 pub use bandmap::{BandMap, CylTracker};
+pub use verdict::{judge, BandClass, BandVerdict, CylinderInput, TempVerdict, Verdict, VerdictInput, VisionVote};
 pub use capture::{
     BandChange, BandChangeFn, BandStat, Capture, CaptureHooks, CaptureState, LogFn, Snapshot,
     TRAVEL_SPEED_CUTOFF,

@@ -131,8 +131,13 @@ fn photo_window(g: &mut Vec<String>, c: &Cfg, cx: f64, cy: f64, r: f64, z: f64,
 /// One calibration pillar: brim, first layer, then a constant-flow spiral
 /// of `layers` whole layers. No metrics, no bands -- the geometry is the
 /// product. Flow is the profile's first-layer rate: safe for any material.
+/// purge_line for the calibration print's standalone path.
+pub(crate) fn purge_line_pub(g: &mut Vec<String>, c: &Cfg, index: usize, temp: i64) {
+    purge_line(g, c, index, temp);
+}
+
 pub(crate) fn pillar(g: &mut Vec<String>, c: &Cfg, cx: f64, cy: f64,
-                     index: usize, layers: usize) {
+                     index: usize, layers: usize, starts_retracted: bool) {
     let xsec1 = extrusion_xsec(c.first_layer_h, c.first_layer_w);
     let xsec = extrusion_xsec(c.layer_h, c.width);
     let r = c.diameter / 2.0;
@@ -143,8 +148,13 @@ pub(crate) fn pillar(g: &mut Vec<String>, c: &Cfg, cx: f64, cy: f64,
     let dz_seg = c.layer_h / nseg as f64;
 
     g.push(String::new());
-    g.push(format!(";=== pillar {} : {:.1}mm ===", index, layers as f64 * c.layer_h));
-    g.push(format!("G1 E-{:.2} F2400 ; retract for travel", c.retract));
+    g.push(format!(";=== pillar {} : top at {:.1}mm ===", index,
+                   c.first_layer_h + layers as f64 * c.layer_h));
+    // exactly one retract per travel: the previous pillar's wipe already
+    // retracted, so retracting again would double up and starve the seam
+    if !starts_retracted {
+        g.push(format!("G1 E-{:.2} F2400 ; retract for travel", c.retract));
+    }
     g.push(format!("G1 Z{:.2} F900", c.safe_z));
     g.push(format!("G1 X{:.3} Y{:.3} F{}", cx + r, cy, c.travel_f));
     g.push(format!("G1 Z{:.2} F600", c.first_layer_h));

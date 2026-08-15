@@ -72,11 +72,19 @@ pub fn generate_calibration(mut c: Cfg) -> Result<CalReport, String> {
 
     let mut cal = c.clone();
     cal.diameter = PILLAR_DIA;
+    // A reference start block ends primed (its own purge); the standalone
+    // block does not -- prime the nozzle or pillar 0's first loops print air.
+    if c.reference.is_none() {
+        emit::purge_line_pub(&mut g, &cal, 0, temp);
+    }
     for (i, ((cx, cy), h_nom)) in place.iter().zip(HEIGHTS).enumerate() {
-        // whole layers, so the printed height equals the recorded height
         let layers = (h_nom / cal.layer_h).round().max(1.0);
-        let h = layers as f64 * cal.layer_h;
-        emit::pillar(&mut g, &cal, *cx, *cy, i, layers as usize);
+        // recorded height is the PHYSICAL top: first layer + spiral layers --
+        // this is the number the calibration clicks are paired with
+        let h = cal.first_layer_h + layers as f64 * cal.layer_h;
+        // pillars after the first start retracted (the previous pillar ends
+        // on a wipe-retract); the first starts primed
+        emit::pillar(&mut g, &cal, *cx, *cy, i, layers as usize, i > 0);
         pillars.push(Pillar { x: *cx, y: *cy, height: h });
     }
     g.push(format!("G1 Z{:.2} F900", cal.safe_z));
@@ -117,9 +125,9 @@ mod tests {
         hs.sort_by(|a, b| a.partial_cmp(b).unwrap());
         hs.dedup_by(|a, b| (*a - *b).abs() < 0.01);
         assert_eq!(hs.len(), 4, "{:?}", r.pillars);
-        // heights are whole layers
+        // heights are the physical top: first layer + whole spiral layers
         for p in &r.pillars {
-            let layers = p.height / 0.4;
+            let layers = (p.height - 0.2) / 0.4;
             assert!((layers - layers.round()).abs() < 1e-9, "{}", p.height);
         }
         // distinct positions
@@ -130,6 +138,16 @@ mod tests {
         assert_eq!(xy.len(), 4);
         let body = std::fs::read_to_string(&out).unwrap();
         assert!(body.contains("calibration print"));
+        // retract ledger: pillar 0 starts primed (1 travel retract);
+        // pillars 1-3 start wipe-retracted (no travel retract). Rings pair
+        // their own retract/deretract (4 pillars x 4 rings). Deretracts:
+        // 16 ring + 4 pillar-travel = 20; wipes leave the file retracted
+        // once at the end. Doubles starve the seam -- hence exact counts.
+        assert_eq!(body.matches("retract for travel").count(), 1);
+        assert_eq!(body.matches("retract for ring approach").count(), 16);
+        assert_eq!(body.matches("; deretract").count(), 20);
+        // standalone start block does not prime: the print must purge
+        assert!(body.contains("purge lane"), "no purge in standalone calibration print");
         std::fs::remove_file(out).ok();
     }
 
