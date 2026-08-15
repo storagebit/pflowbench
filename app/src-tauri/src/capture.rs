@@ -252,6 +252,9 @@ pub(crate) fn capture_start(
     // and there is nothing to export -- recording is tied to the run, not to
     // the camera connection, so the video covers exactly the print.
     if let Some(cam) = state.camera.lock().unwrap().as_ref() {
+        // full keyframe density for the run's evidence reel -- a rate left
+        // behind by a manual timelapse must not thin a bench recording
+        cam.set_timelapse_rate(0.0);
         cam.start_recording();
         logging::info("cmd:capture_start", "camera recording started for this run".to_string());
     }

@@ -79,6 +79,38 @@ pub(crate) fn vision_analyze(state: State<AppState>, dir: String) -> Result<serd
     } else {
         PathBuf::from(expand(dir.trim()))
     };
+    let bands = analyze_dir(&state, &dir)?;
+    let mut stalls = 0usize;
+    let mut rows = Vec::new();
+    for b in &bands {
+        if b.vote == flowvision::Vote::Stall {
+            stalls += 1;
+        }
+        rows.push(serde_json::json!({
+            "cylinder": b.cylinder,
+            "band": b.band + 1,
+            "flow": b.flow,
+            "vote": format!("{:?}", b.vote),
+            "heightPx": b.measure.height_px,
+            "growthPx": b.growth_px,
+            "raggedness": b.raggedness_ratio,
+            "usable": b.usable,
+            "note": b.note,
+        }));
+    }
+    logging::info(
+        "cmd:vision_analyze",
+        format!("{} bands analyzed, {stalls} stalled -- votes only ever downgrade", rows.len()),
+    );
+    Ok(serde_json::json!({ "dir": dir.to_string_lossy(), "bands": rows }))
+}
+
+/// The reusable analysis core: every band still in `dir`, judged. Used by
+/// the vision command above and by the verdict's vision family.
+pub(crate) fn analyze_dir(
+    state: &State<AppState>,
+    dir: &std::path::Path,
+) -> Result<Vec<flowvision::BandVision>, String> {
     let calib = [dir.join("vision.calib"), PathBuf::from("runs").join("vision.calib")]
         .iter()
         .find_map(|p| std::fs::read_to_string(p).ok())
@@ -123,7 +155,6 @@ pub(crate) fn vision_analyze(state: State<AppState>, dir: String) -> Result<serd
 
     let cfg = flowvision::VisionCfg::default();
     let mut bands = Vec::new();
-    let mut stalls = 0usize;
     for c in cyls {
         let Some((_, bx, by)) = positions.get(c) else {
             logging::warn(
@@ -152,32 +183,11 @@ pub(crate) fn vision_analyze(state: State<AppState>, dir: String) -> Result<serd
             }
         }
         match flowvision::analyze_cylinder(&dir, c, &roi, &cfg) {
-            Ok(res) => {
-                for b in res {
-                    if b.vote == flowvision::Vote::Stall {
-                        stalls += 1;
-                    }
-                    bands.push(serde_json::json!({
-                        "cylinder": b.cylinder,
-                        "band": b.band + 1,
-                        "flow": b.flow,
-                        "vote": format!("{:?}", b.vote),
-                        "heightPx": b.measure.height_px,
-                        "growthPx": b.growth_px,
-                        "raggedness": b.raggedness_ratio,
-                        "usable": b.usable,
-                        "note": b.note,
-                    }));
-                }
-            }
+            Ok(mut res) => bands.append(&mut res),
             Err(e) => logging::warn("cmd:vision_analyze", format!("cylinder {c}: {e}")),
         }
     }
-    logging::info(
-        "cmd:vision_analyze",
-        format!("{} bands analyzed, {stalls} stalled -- votes only ever downgrade", bands.len()),
-    );
-    Ok(serde_json::json!({ "dir": dir.to_string_lossy(), "bands": bands }))
+    Ok(bands)
 }
 
 // ---------------------------------------------------- camera calibration

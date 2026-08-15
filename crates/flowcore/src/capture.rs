@@ -89,6 +89,8 @@ pub struct Snapshot {
     pub tares: Vec<(usize, f64, u64)>,
     /// (cylinder, band, t_enter, t_exit) in capture seconds.
     pub band_windows: Vec<(usize, usize, f64, f64)>,
+    /// (cylinder, nozzle temp C) from the manifest; empty without one.
+    pub cylinder_temps: Vec<(usize, i64)>,
 }
 
 /// Anything faster than this is a repositioning move, not printing. The
@@ -179,6 +181,8 @@ pub struct Capture {
     stop: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
     pub map: BandMap,
+    /// (cylinder, nozzle temp C) from the manifest, for the verdict.
+    pub cylinder_temps: Vec<(usize, i64)>,
     logger: LogFn,
 }
 
@@ -219,11 +223,12 @@ impl Capture {
         let state = Arc::new(Mutex::new(CaptureState::default()));
         let stop = Arc::new(AtomicBool::new(false));
         let (st, sp, m, lg) = (state.clone(), stop.clone(), map.clone(), logger.clone());
+        let cylinder_temps = sd_map.as_ref().map(|m| m.cylinder_temps()).unwrap_or_default();
         let on_band = hooks.on_band_change.clone();
         let on_photo = hooks.on_photo_window.clone();
         let handle =
             std::thread::spawn(move || run::run(sock, st, sp, m, sd_map, lg, on_band, on_photo));
-        Ok(Capture { state, stop, handle: Some(handle), map, logger })
+        Ok(Capture { state, stop, handle: Some(handle), map, cylinder_temps, logger })
     }
 
     pub fn stop(&mut self) {
@@ -277,6 +282,7 @@ impl Capture {
             now_bed: s.now_bed,
             now_chamber: s.now_chamber,
             tares: s.tare.iter().map(|(&c, a)| (c, a.mean(), a.n)).collect(),
+            cylinder_temps: self.cylinder_temps.clone(),
             band_windows: s.band_windows.clone(),
         }
     }

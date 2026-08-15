@@ -216,23 +216,7 @@ pub(crate) fn gcode_generate(
         format!("layout stashed for vision: {} test objects", report.cylinder_positions.len()),
     );
 
-    // widen M555 in the spliced start block
-    let body = std::fs::read_to_string(&outp).map_err(|e| format!("{outp}: {e}"))?;
-    let mut widened = 0usize;
-    let fixed: Vec<String> = body
-        .lines()
-        .map(|l| {
-            if l.trim_start().starts_with("M555 ") {
-                widened += 1;
-                format!("M555 X0 Y0 W{bed_w:.0} H{bed_h:.0} ; widened by Flowbench")
-            } else {
-                l.to_string()
-            }
-        })
-        .collect();
-    if widened > 0 {
-        std::fs::write(&outp, fixed.join("\n") + "\n").map_err(|e| e.to_string())?;
-    }
+    let widened = widen_m555(&outp, bed_w, bed_h)?;
     // Manifest LAST: it indexes the file's final bytes, and the M555 rewrite
     // above just shifted every offset. This is what gives the capture
     // deterministic sdpos band addressing.
@@ -373,6 +357,28 @@ pub(crate) fn reference_catalog() -> Result<Vec<serde_json::Value>, String> {
         .collect())
 }
 
+/// Widen M555 so mesh bed levelling covers the whole plate instead of the
+/// dummy reference object's footprint. Returns how many lines were widened.
+fn widen_m555(path: &str, bed_w: f64, bed_h: f64) -> Result<usize, String> {
+    let body = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+    let mut widened = 0usize;
+    let fixed: Vec<String> = body
+        .lines()
+        .map(|l| {
+            if l.trim_start().starts_with("M555 ") {
+                widened += 1;
+                format!("M555 X0 Y0 W{bed_w:.0} H{bed_h:.0} ; widened by Flowbench")
+            } else {
+                l.to_string()
+            }
+        })
+        .collect();
+    if widened > 0 {
+        std::fs::write(path, fixed.join("\n") + "\n").map_err(|e| e.to_string())?;
+    }
+    Ok(widened)
+}
+
 /// Generate the camera calibration print (four pillars of known height at
 /// the bench layout positions). Persists the pillar geometry to
 /// runs/vision.pillars for the modal's guided click flow.
@@ -403,10 +409,18 @@ pub(crate) fn gcode_generate_calibration(
     }
     cfg.reference = Some(refp);
     cfg.standalone = false;
-    cfg.out = outp;
-    let report = flowgen::generate_calibration(cfg).inspect_err(|e| {
+    cfg.out = outp.clone();
+    if let Some(parent) = std::path::Path::new(&outp).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let report = flowgen::generate_calibration(cfg.clone()).inspect_err(|e| {
         logging::error("cmd:gcode_generate_calibration", e.clone());
     })?;
+    let widened = widen_m555(&outp, cfg.bed_x, cfg.bed_y)?;
+    logging::info(
+        "cmd:gcode_generate_calibration",
+        format!("M555 widened: {widened}"),
+    );
     std::fs::create_dir_all("runs").ok();
     let mut text = String::new();
     for p in &report.pillars {

@@ -8,7 +8,15 @@ freshness-gated stills in the app (stale frames saved as *_stale, never as silen
 Phase E Tier 0 + Tier 1 DONE as `crates/flowvision` (§7), validated against run 20260811-191503
 (detects cyl11's growth stall; ignored test); app commands `vision_calibrate` and `vision_analyze`.
 Open: Phase C items 1-4/6 (tare correction exists; min_band_s, probe cylinder, dryness gate
-pending), Phase D verdict engine, Phase F report.
+pending), Phase F report; Phase C items min_band_s, probe cylinder, dryness gate.
+Phase D landed 2026-08-15: crates/flowcore/src/verdict/ implements rules
+1-4 and 8-11 (artifact gate, tare correction, force family R/E/saturation,
+cross-temperature, vision family, combination, foundation-void, ceiling +
+margin). Golden test reproduces run 20260811-191503: 7/7 phantoms
+rejected, 4/4 real cylinders judged, 19.5-32 condemned, melt limit
+flagged. The app's verdict_compute joins capture + vision votes and writes
+verdict.json + snippet.txt per run; the UI verdict card shows the
+per-temperature sentences and the recommendation.
 
 Accuracy addendum 2026-08-14: docs/accuracy-plan.md carries the measured error budget and priority
 list; the vision vote engine rides bed-descent physics (top-edge velocity vs base regression), not

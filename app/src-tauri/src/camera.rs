@@ -94,6 +94,7 @@ pub(crate) fn camera_stats(state: State<AppState>) -> serde_json::Value {
         "recording": s.recording,
         "frames": s.frames,
         "recordedFrames": s.recorded_frames,
+        "lapseRateFpm": s.lapse_rate_fpm,
         "bytes": s.bytes,
         "lastFrameBytes": s.last_frame_bytes,
         "keyframeIntervalS": s.keyframe_interval_s,
@@ -106,11 +107,18 @@ pub(crate) fn camera_stats(state: State<AppState>) -> serde_json::Value {
 /// Start or stop retaining keyframes, independent of a capture run. Starting
 /// discards anything previously held, so each recording is self-contained.
 #[tauri::command]
-pub(crate) fn camera_record(state: State<AppState>, on: bool) -> Result<usize, String> {
-    logging::trace("cmd:camera_record", format!("on={on}"));
+pub(crate) fn camera_record(
+    state: State<AppState>,
+    on: bool,
+    rate_fpm: Option<f64>,
+) -> Result<usize, String> {
+    logging::trace("cmd:camera_record", format!("on={on} rate_fpm={rate_fpm:?}"));
     let slot = state.camera.lock().unwrap();
     let cam = slot.as_ref().ok_or("camera not connected")?;
     if on {
+        // 1..=60 frames per minute; the camera's ~3s keyframe cadence
+        // (~20/min) is the physical maximum -- higher just keeps every one
+        cam.set_timelapse_rate(rate_fpm.unwrap_or(0.0));
         cam.start_recording();
         logging::info("cmd:camera_record", "recording started".to_string());
     } else {
@@ -168,6 +176,12 @@ pub(crate) fn camera_write_timelapse(state: State<AppState>, fps: u32) -> Result
         path.display()
     );
     logging::info("cmd:camera_write_timelapse", msg.clone());
+    // hand the finished video to the OS default player
+    let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+    match std::process::Command::new(opener).arg(&path).spawn() {
+        Ok(_) => logging::info("cmd:camera_write_timelapse", format!("opened {}", path.display())),
+        Err(e) => logging::warn("cmd:camera_write_timelapse", format!("could not open: {e}")),
+    }
     Ok(msg)
 }
 

@@ -131,14 +131,30 @@ pub(crate) async fn run(
         // Retain the raw access unit before decoding: the timelapse remuxes
         // these verbatim, so it stays lossless and costs no extra encode.
         if is_key && shared.recording.load(Ordering::Relaxed) {
-            let mut reel = shared.reel.lock().unwrap();
-            if reel.len() < MAX_REEL_FRAMES {
-                reel.push(frame.data().to_vec());
-                if reel.len() == MAX_REEL_FRAMES {
-                    logger("warn", format!(
-                        "camera: timelapse reel hit its {MAX_REEL_FRAMES}-frame cap; \
-                         later frames will not be recorded"
-                    ));
+            // Timelapse rate gate: keep a keyframe only when the configured
+            // interval has passed since the last kept one. 0 = keep every
+            // keyframe (the camera's ~3s cadence is the physical maximum).
+            let interval_us = shared.lapse_interval_us.load(Ordering::Relaxed);
+            let now = std::time::Instant::now();
+            let due = {
+                let last = shared.lapse_last.lock().unwrap();
+                match (*last, interval_us) {
+                    (_, 0) => true,
+                    (None, _) => true,
+                    (Some(t0), us) => now.duration_since(t0).as_micros() as u64 >= us,
+                }
+            };
+            if due {
+                *shared.lapse_last.lock().unwrap() = Some(now);
+                let mut reel = shared.reel.lock().unwrap();
+                if reel.len() < MAX_REEL_FRAMES {
+                    reel.push(frame.data().to_vec());
+                    if reel.len() == MAX_REEL_FRAMES {
+                        logger("warn", format!(
+                            "camera: timelapse reel hit its {MAX_REEL_FRAMES}-frame cap; \
+                             later frames will not be recorded"
+                        ));
+                    }
                 }
             }
         }

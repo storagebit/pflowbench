@@ -41,6 +41,10 @@ pub(crate) struct Shared {
     pub(crate) live: AtomicBool,
     /// Retained Annex-B keyframe access units, in arrival order.
     pub(crate) reel: Mutex<Vec<Vec<u8>>>,
+    /// Timelapse capture interval in microseconds; 0 = every keyframe.
+    pub(crate) lapse_interval_us: std::sync::atomic::AtomicU64,
+    /// When the last reel frame was kept, for the rate gate.
+    pub(crate) lapse_last: Mutex<Option<std::time::Instant>>,
     /// Live counters for the stats readout.
     pub(crate) counters: Mutex<Counters>,
 }
@@ -61,6 +65,8 @@ pub(crate) struct Counters {
 pub struct CameraStats {
     pub connected: bool,
     pub recording: bool,
+    /// Configured timelapse rate, frames per minute; 0 = every keyframe.
+    pub lapse_rate_fpm: f64,
     pub frames: u64,
     pub recorded_frames: usize,
     pub bytes: u64,
@@ -193,6 +199,7 @@ impl Camera {
             connected: self.shared.connected.load(Ordering::Relaxed),
             recording: self.shared.recording.load(Ordering::Relaxed),
             frames: c.frames,
+            lapse_rate_fpm: self.timelapse_rate(),
             recorded_frames: self.shared.reel.lock().unwrap().len(),
             bytes: c.bytes,
             last_frame_bytes: c.last_frame_bytes,
@@ -224,8 +231,29 @@ impl Camera {
 
     /// Begin retaining keyframes for a timelapse. Clears anything previously
     /// retained, so one call per run.
+    /// Timelapse capture rate in frames per minute, clamped to 1..=60.
+    /// The camera publishes a keyframe roughly every 3 s (~20/min), which is
+    /// the physical maximum in keyframe-only mode -- higher settings simply
+    /// keep every keyframe. 0 restores keep-every-keyframe.
+    pub fn set_timelapse_rate(&self, frames_per_minute: f64) {
+        let us = if frames_per_minute <= 0.0 {
+            0
+        } else {
+            (60_000_000.0 / frames_per_minute.clamp(1.0, 60.0)) as u64
+        };
+        self.shared.lapse_interval_us.store(us, Ordering::Relaxed);
+    }
+
+    pub fn timelapse_rate(&self) -> f64 {
+        match self.shared.lapse_interval_us.load(Ordering::Relaxed) {
+            0 => 0.0,
+            us => 60_000_000.0 / us as f64,
+        }
+    }
+
     pub fn start_recording(&self) {
         self.shared.reel.lock().unwrap().clear();
+        *self.shared.lapse_last.lock().unwrap() = None;
         self.shared.recording.store(true, Ordering::Relaxed);
     }
 

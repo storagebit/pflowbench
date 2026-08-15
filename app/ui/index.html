@@ -183,6 +183,8 @@
   .lvl-info  .lvl, .lvl-info  .msg { color: var(--log-info); }
   .lvl-warn  .lvl, .lvl-warn  .msg { color: var(--log-warn); }
   .lvl-error .lvl, .lvl-error .msg { color: var(--log-error); }
+  #lapseRates .rate { min-width: 34px; }
+  #lapseRates .rate.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -193,7 +195,7 @@
 <main>
   <aside>
     <div class="card">
-      <h2>Printer</h2>
+      <h2>1 &middot; Printer</h2>
       <label>Address</label>
       <input id="addr" placeholder="printer address">
       <label>Auth</label>
@@ -214,7 +216,7 @@
     </div>
 
     <div class="card">
-      <h2>Test parameters</h2>
+      <h2>3 &middot; Test parameters</h2>
       <label>Flows (mm&sup3;/s)</label>
       <input id="flows" value="8,10,12,14,16,18,20,22,24">
       <div class="row">
@@ -227,7 +229,7 @@
     </div>
 
     <div class="card">
-      <h2>Camera</h2>
+      <h2>2 &middot; Camera <span style="font-weight:400;color:var(--dim)">(optional)</span></h2>
       <label>Buddy3D address</label>
       <input id="camhost" placeholder="camera address">
       <div class="row">
@@ -238,16 +240,7 @@
         <button id="camStopBtn" class="ghost" disabled>Disconnect</button>
         <button id="camCopyBtn" class="ghost" disabled>Copy image</button>
       </div>
-      <div class="row">
-        <button id="camRecBtn" class="ghost" disabled>● Record</button>
-        <button id="camLapseBtn" class="ghost" disabled>Export MP4</button>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <button id="visionCalBtn" class="ghost" disabled>Calibrate vision</button>
-        <button id="calModalBtn" class="ghost">Camera calibration</button>
-        <button id="visionRunBtn" class="ghost">Analyze run</button>
-        <span id="visionState" style="font-size:11px;color:var(--dim)"></span>
-      </div>
+
       <label style="margin-top:12px">
         <input type="checkbox" id="camLive"
                style="width:auto;margin-right:6px;vertical-align:-1px">
@@ -261,7 +254,46 @@
     </div>
 
     <div class="card">
-      <h2>Generate job</h2>
+      <h2>Timelapse</h2>
+      <label>Capture rate (frames per minute)</label>
+      <div class="row" id="lapseRates">
+        <button class="ghost rate" data-fpm="1">1</button>
+        <button class="ghost rate" data-fpm="2">2</button>
+        <button class="ghost rate" data-fpm="5">5</button>
+        <button class="ghost rate active" data-fpm="10">10</button>
+        <input id="lapseCustom" type="number" min="1" max="60" placeholder="custom"
+               title="1 to 60 frames per minute" style="width:70px">
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="camRecBtn" disabled title="record timelapse frames at the chosen rate">&#9679; Record</button>
+        <button id="camLapseBtn" class="ghost" disabled
+                title="render the recorded frames to MP4 and open it">Render timelapse</button>
+      </div>
+      <div id="lapseStatus" style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:8px">
+        idle</div>
+      <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.4">
+        The camera delivers a keyframe about every 3 s (~20/min); higher
+        rates keep every keyframe. Capture also starts automatically with
+        every bench run.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Vision</h2>
+      <div class="stat"><span>camera model</span><b id="visionChip">unknown</b></div>
+      <div class="row">
+        <button id="calModalBtn" class="ghost" title="print pillars once, click them, done">Calibrate camera</button>
+        <button id="visionRunBtn" class="ghost" title="votes per band from the run's stills">Analyze run</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="visionCalBtn" class="ghost" disabled
+                title="fallback: 4-click plane calibration, no pillar print needed">Quick calibrate (4 clicks)</button>
+        <span id="visionState" style="font-size:11px;color:var(--dim)"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>4 &middot; Generate job</h2>
       <label>Material profile</label>
       <select id="profileSel"><option value="">(defaults - no profile)</option></select>
       <div id="profileInfo" style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.45"></div>
@@ -270,21 +302,25 @@
       <label>Metrics host &mdash; where the printer sends telemetry
         <span id="ipHint" style="float:right;color:var(--dim)"></span></label>
       <input id="mhost" placeholder="auto-detected">
-      <button id="genBtn" class="ghost">Generate G-code</button>
+      <button id="genBtn" title="builds the G-code and the band manifest">Generate G-code</button>
     </div>
 
     <div class="card">
-      <h2>Run</h2>
+      <h2>5 &middot; Run</h2>
       <label>G-code file (absolute path or ~/...)</label>
       <input id="gpath" value="~/flowbench/gcode/flowcliff.gcode">
       <div class="row">
         <div><label>Storage</label><input id="storage" value="usb"></div>
         <div><label>Name on printer</label><input id="gname" value="flowcliff.gcode"></div>
       </div>
-      <button id="uploadBtn" class="ghost">Upload only</button>
+      <button id="uploadBtn" class="ghost" title="PUT the file to the printer without printing">Upload only</button>
       <div class="row">
-        <button id="startBtn">Start capture</button>
+        <button id="startBtn" title="opens the UDP listener and the run directory">Start capture</button>
         <button id="stopBtn" class="stop" disabled>Stop</button>
+      </div>
+      <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.4">
+        Order matters: start capture first, then print &mdash; the capture
+        must be listening when the job arms the metrics.
       </div>
       <button id="exportBtn" class="ghost">Export data (CSV)</button>
     </div>
@@ -345,6 +381,22 @@
     <div class="card">
       <div class="plot-title">Head speed (mm/s) and chamber temperature (&deg;C)</div>
       <div id="splot"></div>
+    </div>
+
+    <div class="card">
+      <h2>Verdict</h2>
+      <div class="row" style="align-items:center">
+        <button id="verdictBtn" title="judge the captured run: force rules + vision votes">Compute verdict</button>
+        <span style="font-size:11px;color:var(--dim)">margin</span>
+        <select id="verdictMargin" title="safety margin below the measured ceiling, in ladder rungs">
+          <option value="0">0 rungs</option>
+          <option value="1" selected>1 rung</option>
+          <option value="2">2 rungs</option>
+        </select>
+      </div>
+      <div id="verdictHead" style="font-family:var(--mono);font-size:15px;margin-top:10px"></div>
+      <div id="verdictBody" style="font-family:var(--mono);font-size:12px;line-height:1.7;margin-top:6px"></div>
+      <div id="verdictFlags" style="font-size:11px;color:var(--warn);margin-top:6px;line-height:1.5"></div>
     </div>
 
     <div class="card">

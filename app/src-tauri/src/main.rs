@@ -30,6 +30,7 @@ mod printer;
 mod snapshots;
 mod state;
 mod stills;
+mod verdict;
 mod vision;
 
 use state::AppState;
@@ -80,7 +81,8 @@ fn main() {
             vision::vision_calibrate,
             vision::vision_analyze,
             vision::vision_camera_status,
-            vision::vision_camera_calibrate
+            vision::vision_camera_calibrate,
+            verdict::verdict_compute
         ])
         .run(tauri::generate_context!())
         .expect("error while running PFlowBench");
