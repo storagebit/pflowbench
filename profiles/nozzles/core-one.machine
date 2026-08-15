@@ -1,0 +1,17 @@
+# Prusa CORE One / CORE One+ -- motion limits from the vendor bundle
+# (PrusaResearch.ini config_version 2.5.5, [printer:Prusa CORE One *] roots).
+# Values are the "normal" mode entry of each (normal,silent) pair.
+name = Prusa CORE One / CORE One+
+max_feedrate_xy = 350
+max_feedrate_z = 12
+max_feedrate_e = 100
+max_accel_print = 7000
+max_accel_travel = 7000
+max_jerk_xy = 10
+note = [sourced] Bundle 2.5.5, verified by independent re-resolution of all 28
+note = CORE One family printer presets (0 mismatches). Axis accel cap 10000;
+note = silent-mode pairs: xy 160, accel 2500, jerk 8.
+note = [sourced] Height-based accel derate in before_layer_gcode:
+note = (0,7000)(150,7000)(200,4000)(270,2000) -- print accel falls with Z.
+note = [sourced] Bed 250x220, height 270. Max chamber 55 C (CORE One+ page).
+note = [sourced] Print-preset travel_speed is 350 across all @COREONE presets.

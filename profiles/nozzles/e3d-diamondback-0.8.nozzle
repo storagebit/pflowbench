@@ -1,0 +1,32 @@
+# Polycrystalline-diamond tip, standard-flow bore. There is NO published
+# flow table for any DiamondBack Nextruder nozzle -- checked on the E3D
+# product page, the E3D support/datasheet page, and Prusa's listing, all
+# current. Every ceiling for this nozzle comes from this bench or nowhere.
+name = E3D DiamondBack 0.8
+vendor = e3d
+tip = pcd
+diameter = 0.8
+high_flow = 0
+abrasive_ok = 1
+preset_variant = 0.8
+retract = 0.6
+retract_speed = 25
+default_layer_h = 0.4
+default_width = 0.9
+default_speed_external = 45
+default_speed_perimeter = 50
+default_speed_infill = 90
+default_speed_travel = 350
+note = [sourced] Standard-flow classification is explicit: Prusa's listing
+note = says "For optimal results use standard flow profiles in your Prusa
+note = Slicer"; E3D recommends standard profiles as a starting point; no HF
+note = geometry is claimed anywhere. Max 300 C, mass ~8 g, native Nextruder
+note = format, MK4/S + XL + CORE One family.
+note = [sourced] PCD tip: extreme wear resistance (metal/ceramic-filled
+note = filaments in scope) and best-in-class thermal conductivity claims --
+note = conductivity of the TIP does not change the melt-zone bore, so treat
+note = flow expectations as standard-class.
+measured = petg-cf: visual knee 16-18 mm3/s vs published 22 (loadcell bench + wall inspection, UNDRIED spool -- provisional, 2026-08)
+measured = pc-blend-cf: ceiling bracketed 8-12 mm3/s vs published 18 (loadcell bench, 2026-08)
+note = [measured] The two runs above are this database's only DiamondBack
+note = flow data points anywhere. PLA-CF run pending (profile staged).

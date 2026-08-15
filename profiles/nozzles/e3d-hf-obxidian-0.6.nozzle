@@ -1,0 +1,26 @@
+# The nozzle your elegoo-pla-cf-0.6-hf-obxidian profile targets.
+name = E3D High Flow ObXidian 0.6
+vendor = e3d
+tip = obxidian
+diameter = 0.6
+high_flow = 1
+abrasive_ok = 1
+preset_variant = HF0.6
+retract = 0.7
+retract_speed = 45
+default_layer_h = 0.32
+default_width = 0.68
+default_speed_external = 145
+default_speed_perimeter = 160
+default_speed_infill = 160
+default_speed_travel = 350
+claim_mvs_pla = 30
+claim_mvs_petg = 36
+claim_mvs_asa = 32
+note = [sourced] E3D HF ObXidian flow table (page states "Mk4 & XL"
+note = compatibility; CORE One fitment inferred from shared format). PETG 36 vs Prusa's bundle
+note = ceiling 28-30 for the same combo: treat E3D's number as optimistic
+note = until the bench measures it (the bundle has already been caught
+note = overstating knees on this bench; E3D publishes no test method).
+note = [sourced] Prusa bundle HF0.6 ceilings for materials E3D omits:
+note = ABS 34, PC 28, PA 15 (preset-tier trust).

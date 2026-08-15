@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PFlowBench</title>
+<link rel="stylesheet" href="vendor/uPlot.min.css">
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #121722; --panel2: #171d2b; --line: #232b3d;
+    --text: #dbe2ef; --dim: #8792a8; --accent: #4cc2ff; --good: #3ddc97;
+    --prusa: #fa6831; /* Prusa orange -- brand accents (header wordmark, icon) */
+    --warn: #ffb454; --bad: #ff6b6b; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    /* console log levels only -- kept separate from --warn/--dim/--accent above so
+       recoloring the log doesn't also recolor the Z-axis plot, knee marker, etc. */
+    --log-trace: #b48cff; --log-info: #ffffff; --log-warn: #ffe14d; --log-error: var(--bad);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 18px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #10151f, #0d1119);
+    flex: 0 0 auto;
+  }
+  header h1 { font-size: 15px; margin: 0; letter-spacing: .06em; font-weight: 600; }
+  header h1 span { color: var(--prusa); }
+  #conn { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+  #conn.ok { color: var(--good); }
+  #conn.err { color: var(--bad); }
+  main {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    display: grid; grid-template-columns: 320px 1fr; gap: 14px; padding: 14px;
+  }
+  /* Grid children default to min-width:auto, i.e. sized by their content. A
+     wide horizontally-scrolling child (the band strip, or a plot) would then
+     stretch its whole column instead of scrolling inside it, dragging the
+     layout sideways. min-width:0 lets the track keep its declared size. */
+  main > aside, main > section { min-width: 0; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  .card h2 {
+    margin: 0 0 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--dim); font-weight: 600;
+  }
+  label { display: block; font-size: 12px; color: var(--dim); margin: 8px 0 3px; }
+  input, select {
+    width: 100%; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent); color: #06131c; border: 0; border-radius: 6px;
+    padding: 8px 14px; font-weight: 600; cursor: pointer; margin-top: 10px;
+  }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  button.stop { background: var(--bad); color: #1c0606; }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .stat { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12.5px; padding: 2px 0; }
+  .stat b { color: var(--text); font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--dim); font-weight: 500; }
+  td:first-child, th:first-child { text-align: left; }
+  .knee { color: var(--warn); }
+  .plot-title { font-size: 12px; color: var(--dim); margin: 2px 0 6px; }
+
+  /* -------------------------------------------------------------- camera */
+  .cam-head { display: flex; align-items: baseline; gap: 10px; margin: 2px 0 8px; }
+  .cam-head .plot-title { margin: 0; }
+  #camState { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-left: auto; }
+  #camState.live { color: var(--good); }
+  #camState.err { color: var(--bad); }
+  #camWrap {
+    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    /* cap the height: at full width on a wide window a 16:9 box would be
+       ~650px tall and push the force plot and stats table off-screen.
+       object-fit:contain letterboxes the frame inside whatever is left. */
+    max-height: 400px; background: #05070b;
+    border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #camImg { width: 100%; height: 100%; object-fit: contain; display: none; }
+  #camImg.on { display: block; }
+  #camHint { color: var(--dim); font-size: 12px; font-family: var(--mono); text-align: center; padding: 0 20px; }
+  /* live indicator */
+  #camDot {
+    position: absolute; top: 8px; left: 8px; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--bad); box-shadow: 0 0 0 3px rgba(0,0,0,.45); display: none;
+  }
+  #camDot.on { display: block; background: var(--good); animation: camPulse 2s infinite; }
+  @keyframes camPulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+
+  /* ------------------------------------------------------ snapshot strip */
+  /* stream details readout in the camera card */
+  #camInfo { margin-top: 10px; font-size: 11px; }
+  #camInfo:empty { display: none; }
+  #camInfo td { padding: 2px 0; border: 0; text-align: left; }
+  #camInfo td:first-child { color: var(--dim); white-space: nowrap; padding-right: 10px; }
+  #camInfo td:last-child { color: var(--text); text-align: right; }
+
+  /* any wide table scrolls inside its own card instead of stretching the
+     grid column and dragging the page sideways */
+  #btab { display: block; overflow-x: auto; max-width: 100%; }
+  #snapStrip {
+    display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px;
+    /* belt and braces: never let the strip itself become the widest thing on
+       the page, however many bands get captured */
+    min-width: 0; max-width: 100%; scrollbar-width: thin;
+  }
+  #snapStrip:empty::after {
+    content: "band snapshots appear here as each flow rate completes";
+    color: var(--dim); font-size: 12px; font-family: var(--mono);
+  }
+  .snap {
+    flex: 0 0 auto; width: 150px; cursor: pointer; border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden; background: var(--panel2);
+  }
+  .snap:hover { border-color: var(--accent); }
+  .snap img { width: 100%; height: 84px; object-fit: cover; display: block; }
+  .snap .cap {
+    font-family: var(--mono); font-size: 10.5px; padding: 4px 6px; color: var(--dim);
+    display: flex; justify-content: space-between; gap: 6px;
+  }
+  .snap .cap b { color: var(--text); font-weight: 600; }
+
+  /* lightbox for a full-size look */
+  #lightbox {
+    position: fixed; inset: 0; background: rgba(3,5,9,.92); z-index: 50;
+    display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  }
+  #lightbox.on { display: flex; }
+  #lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 8px; }
+  #lightboxCap { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+
+  /* -------------------------------------------------------- console log bar */
+  #logbar {
+    flex: 0 0 260px; min-height: 120px; max-height: 80vh; resize: vertical;
+    overflow: hidden; display: flex; flex-direction: column;
+    border-top: 1px solid var(--line); background: #080a0f;
+  }
+  .logbar-head {
+    display: flex; align-items: center; gap: 14px; padding: 7px 14px;
+    border-bottom: 1px solid var(--line); background: var(--panel); flex: 0 0 auto;
+  }
+  .logbar-head h2 {
+    margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--dim); font-weight: 600; white-space: nowrap;
+  }
+  .logbar-filters { display: flex; gap: 12px; font-family: var(--mono); font-size: 11px; }
+  .logbar-filters label { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+  .logbar-filters input {
+    appearance: auto; width: auto; height: auto; margin: 0; padding: 0;
+    background: none; border: 0; border-radius: 0; accent-color: currentColor;
+  }
+  .logbar-filters label[data-lvl="trace"] { color: var(--log-trace); }
+  .logbar-filters label[data-lvl="info"]  { color: var(--log-info); }
+  .logbar-filters label[data-lvl="warn"]  { color: var(--log-warn); }
+  .logbar-filters label[data-lvl="error"] { color: var(--log-error); }
+  .logbar-actions { margin-left: auto; display: flex; gap: 8px; }
+  .logbar-actions button {
+    margin-top: 0; padding: 5px 11px; font-size: 11px; font-weight: 600;
+  }
+  #log {
+    flex: 1 1 auto; overflow-y: auto; padding: 6px 14px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.6;
+  }
+  .logline { display: flex; gap: 10px; white-space: pre-wrap; word-break: break-word; }
+  .logline .t { flex: 0 0 auto; color: var(--dim); }
+  .logline .lvl { flex: 0 0 5ch; font-weight: 700; }
+  .logline .msg { flex: 1 1 auto; }
+  .logline .cnt { flex: 0 0 auto; color: var(--dim); }
+  .lvl-trace .lvl, .lvl-trace .msg { color: var(--log-trace); }
+  .lvl-info  .lvl, .lvl-info  .msg { color: var(--log-info); }
+  .lvl-warn  .lvl, .lvl-warn  .msg { color: var(--log-warn); }
+  .lvl-error .lvl, .lvl-error .msg { color: var(--log-error); }
+</style>
+</head>
+<body>
+<header>
+  <h1>PFLOW<span>BENCH</span></h1>
+  <div id="conn">printer: not checked</div>
+</header>
+<main>
+  <aside>
+    <div class="card">
+      <h2>Printer</h2>
+      <label>Address</label>
+      <input id="addr" placeholder="printer address">
+      <label>Auth</label>
+      <select id="mode">
+        <option value="apikey">PrusaLink API key</option>
+        <option value="digest">Digest (user + password)</option>
+      </select>
+      <div id="userRow" style="display:none">
+        <label>Username</label>
+        <input id="user" value="maker">
+      </div>
+      <label>Secret <span id="keyState" style="float:right"></span></label>
+      <input id="secret" type="password" placeholder="stored in OS keychain only">
+      <div class="row">
+        <button id="saveKey" class="ghost">Save key</button>
+        <button id="testBtn">Test</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Test parameters</h2>
+      <label>Flows (mm&sup3;/s)</label>
+      <input id="flows" value="8,10,12,14,16,18,20,22,24">
+      <div class="row">
+        <div><label>Revs/band</label><input id="revs" value="4"></div>
+        <div><label>Layer (mm)</label><input id="layerh" value="0.4"></div>
+        <div><label>1st layer</label><input id="flh" value="0.2"></div>
+      </div>
+      <label>UDP port (M334 target)</label>
+      <input id="port" value="8514">
+    </div>
+
+    <div class="card">
+      <h2>Camera</h2>
+      <label>Buddy3D address</label>
+      <input id="camhost" placeholder="camera address">
+      <div class="row">
+        <button id="camTestBtn" class="ghost">Test</button>
+        <button id="camStartBtn">Connect</button>
+      </div>
+      <div class="row">
+        <button id="camStopBtn" class="ghost" disabled>Disconnect</button>
+        <button id="camCopyBtn" class="ghost" disabled>Copy image</button>
+      </div>
+      <div class="row">
+        <button id="camRecBtn" class="ghost" disabled>● Record</button>
+        <button id="camLapseBtn" class="ghost" disabled>Export MP4</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="visionCalBtn" class="ghost" disabled>Calibrate vision</button>
+        <button id="calModalBtn" class="ghost">Camera calibration</button>
+        <button id="visionRunBtn" class="ghost">Analyze run</button>
+        <span id="visionState" style="font-size:11px;color:var(--dim)"></span>
+      </div>
+      <label style="margin-top:12px">
+        <input type="checkbox" id="camLive"
+               style="width:auto;margin-right:6px;vertical-align:-1px">
+        Full-rate live video (off = one frame per keyframe, ~3s)
+      </label>
+      <table id="camInfo"></table>
+      <div style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.4">
+        Needs local streaming enabled for the camera in the Prusa App &mdash;
+        it is off by default and the camera refuses RTSP until then.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Generate job</h2>
+      <label>Material profile</label>
+      <select id="profileSel"><option value="">(defaults - no profile)</option></select>
+      <div id="profileInfo" style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.45"></div>
+      <label>Reference export (used only when no profile is selected)</label>
+      <input id="refpath" value="~/flowbench/reference/ref.gcode">
+      <label>Metrics host &mdash; where the printer sends telemetry
+        <span id="ipHint" style="float:right;color:var(--dim)"></span></label>
+      <input id="mhost" placeholder="auto-detected">
+      <button id="genBtn" class="ghost">Generate G-code</button>
+    </div>
+
+    <div class="card">
+      <h2>Run</h2>
+      <label>G-code file (absolute path or ~/...)</label>
+      <input id="gpath" value="~/flowbench/gcode/flowcliff.gcode">
+      <div class="row">
+        <div><label>Storage</label><input id="storage" value="usb"></div>
+        <div><label>Name on printer</label><input id="gname" value="flowcliff.gcode"></div>
+      </div>
+      <button id="uploadBtn" class="ghost">Upload only</button>
+      <div class="row">
+        <button id="startBtn">Start capture</button>
+        <button id="stopBtn" class="stop" disabled>Stop</button>
+      </div>
+      <button id="exportBtn" class="ghost">Export data (CSV)</button>
+    </div>
+
+    <div class="card">
+      <h2>Live</h2>
+      <div class="stat"><span>state</span><b id="pstate">-</b></div>
+      <div class="stat"><span>nozzle</span><b id="pnoz">-</b></div>
+      <div class="stat"><span>bed</span><b id="pbed">-</b></div>
+      <div class="stat"><span>chamber</span><b id="pcham">-</b></div>
+      <div class="stat"><span>speed</span><b id="pspeed">-</b></div>
+      <div class="stat"><span>Z</span><b id="pz">-</b></div>
+      <div class="stat"><span>cylinder</span><b id="pcyl">-</b></div>
+      <div class="stat"><span>samples</span><b id="pn">0</b></div>
+    </div>
+
+  </aside>
+
+  <section>
+    <div class="card">
+      <div class="cam-head">
+        <div class="plot-title">Camera - what the nozzle is actually laying down</div>
+        <span id="camState">camera: off</span>
+      </div>
+      <div id="camWrap">
+        <span id="camDot"></span>
+        <img id="camImg" alt="live view from the printer camera">
+        <div id="camHint">not connected</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Band snapshots</h2>
+      <div id="snapStrip"></div>
+    </div>
+
+    <div class="card">
+      <div class="plot-title">Loadcell force (g) and Z (mm) - live</div>
+      <div id="chartNav" style="display:flex;gap:6px;align-items:center;margin:2px 0 6px 0;font-size:12px">
+        <button id="navStart" title="jump to the start of the run">&#9198;</button>
+        <button id="navBack" title="back half a window">&#9664;</button>
+        <button id="navFwd" title="forward half a window">&#9654;</button>
+        <button id="navLive" title="follow the latest data">&#9197; Live</button>
+        <select id="navSpan" title="window length">
+          <option value="60">1 min</option>
+          <option value="300" selected>5 min</option>
+          <option value="900">15 min</option>
+          <option value="all">All</option>
+        </select>
+        <span id="navPos" style="color:var(--dim)"></span>
+      </div>
+      <div id="tplot"></div>
+    </div>
+    <div class="card">
+      <div class="plot-title">Mean back-pressure vs commanded flow - the knee is the candidate ceiling</div>
+      <div id="kplot"></div>
+    </div>
+    <div class="card">
+      <div class="plot-title">Head speed (mm/s) and chamber temperature (&deg;C)</div>
+      <div id="splot"></div>
+    </div>
+
+    <div class="card">
+      <h2>Band statistics</h2>
+      <table id="btab"><thead>
+        <tr><th>cyl</th><th>band</th><th>cmd flow</th><th>actual</th><th>speed</th><th>n</th><th>mean (g)</th><th>sd</th><th>&Delta; vs band 1</th></tr>
+      </thead><tbody></tbody></table>
+    </div>
+  </section>
+</main>
+
+<footer id="logbar">
+  <div class="logbar-head">
+    <h2>Console</h2>
+    <div class="logbar-filters">
+      <label data-lvl="trace"><input type="checkbox" class="lvl" value="trace" checked>trace</label>
+      <label data-lvl="info"><input type="checkbox" class="lvl" value="info" checked>info</label>
+      <label data-lvl="warn"><input type="checkbox" class="lvl" value="warn" checked>warn</label>
+      <label data-lvl="error"><input type="checkbox" class="lvl" value="error" checked>error</label>
+    </div>
+    <div class="logbar-actions">
+      <button id="logCopy" class="ghost">Copy</button>
+      <button id="logClear" class="ghost">Clear</button>
+    </div>
+  </div>
+  <div id="log"></div>
+</footer>
+
+<div id="lightbox">
+  <img id="lightboxImg" alt="band snapshot">
+  <div id="lightboxCap"></div>
+</div>
+
+<script src="vendor/uPlot.iife.min.js"></script>
+<script src="app.js"></script>
+<div id="calModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50">
+  <div style="max-width:460px;margin:10vh auto;background:var(--card,#1c1c1e);border:1px solid var(--line,#333);border-radius:8px;padding:20px">
+    <h2 style="margin-top:0">Vision camera calibration</h2>
+    <div id="calState" style="font-family:var(--mono);font-size:12px;margin-bottom:12px">checking...</div>
+    <ol style="font-size:12px;color:var(--dim);line-height:1.5;padding-left:18px">
+      <li>Generate the calibration print (uses the current reference/profile).</li>
+      <li>Upload and print it. Four pillars of different heights.</li>
+      <li>With the finished print still on the bed and the camera live,
+          click each pillar's BASE centre then TOP centre, front-left first,
+          in the order the prompt gives.</li>
+    </ol>
+    <div class="row" style="margin-top:10px">
+      <button id="calGenBtn" class="ghost">Generate calibration G-code</button>
+      <button id="calClickBtn" class="ghost" disabled>Start clicking</button>
+      <button id="calCloseBtn" class="ghost">Close</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# Prusa CORE One L / L+ -- NOT motion-identical to the CORE One, and the
+# direction is counterintuitive: faster X/Y feedrate, derated travel accel.
+name = Prusa CORE One L
+max_feedrate_xy = 500
+max_feedrate_z = 15
+max_feedrate_e = 100
+max_accel_print = 7000
+max_accel_travel = 6000
+max_jerk_xy = 10
+note = [sourced] Bundle 2.5.5 [printer:Prusa CORE One L *] roots; travel spec
+note = confirmed on prusa3d.com/product/prusa-core-one-l-2/ ("Maximum Travel
+note = Speed: 500 mm/s"). Retracting accel derated to (2500,1200) vs the
+note = CORE One's (2500,2500). Axis accel cap 10000; silent xy 160.
+note = [sourced] Height derate: (0,6000)(150,6000)(200,4000)(331,2000).
+note = [sourced] Bed 300x300, height 330. Max chamber 60 C, active convection.
+note = [sourced] L printers reuse the shared @COREONE filament presets and
+note = @COREONEL print presets; print-preset travel_speed stays 350 -- the
+note = 500 machine limit is headroom, not a preset speed.

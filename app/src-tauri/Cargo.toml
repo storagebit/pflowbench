@@ -1,0 +1,40 @@
+[package]
+name = "pflowbench-app"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+# Tauri glue. Logic lives in the flowcore / prusalink / flowgen crates, which
+# carry the unit tests. Detached from the parent workspace via the [workspace]
+# table below.
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+flowcore = { path = "../../crates/flowcore" }
+prusalink = { path = "../../crates/prusalink" }
+flowgen = { path = "../../crates/flowgen" }
+flowvision = { path = "../../crates/flowvision" }
+flowcam = { path = "../../crates/flowcam" }
+
+[workspace]
+
+# Performance over binary size -- see the same block in the root Cargo.toml.
+# This crate is its own workspace, so the profile has to be repeated here;
+# the root one does not reach it.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "debuginfo"
+# NOTE: no `panic = "abort"` here. Tauri commands rely on unwinding to turn a
+# panic in a command into an error rather than taking down the whole app.
+
+# Keep dependencies optimised during development, so `cargo run` gives a
+# realistic frame rate instead of a debug-built H.264 decoder and JPEG encoder.
+[profile.dev.package."*"]
+opt-level = 3

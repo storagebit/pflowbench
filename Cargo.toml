@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = ["crates/flowcore", "crates/prusalink", "crates/flowgen", "crates/flowcam", "crates/flowvision"]
+# app/src-tauri is intentionally NOT a workspace member: Tauri v2 needs a newer
+# rustc + system webkit than this build container has. Build it on your box.
+
+# Tuned for throughput, not binary size. The hot path is H.264 decode plus a
+# full-resolution JPEG encode per frame at ~25fps; anything that slows that
+# down starves the RTSP socket reader and desynchronises interleaved framing,
+# which is a stream-killing fault rather than a cosmetic slowdown.
+[profile.release]
+opt-level = 3
+lto = "fat"          # cross-crate inlining, notably into jpeg-encoder
+codegen-units = 1    # no parallel-codegen optimisation barriers
+panic = "abort"      # no unwind tables in the hot loops
+strip = "debuginfo"  # smaller artifact, no effect on speed
+
+# Dependencies stay fully optimised even in a debug build of our own code, so
+# `cargo run` during development isn't crippled by a debug-built decoder and
+# JPEG encoder -- that alone was an order of magnitude on this workload.
+[profile.dev.package."*"]
+opt-level = 3
+
+# openh264's vendored C and the JPEG encoder dominate; optimise them hard even
+# when the surrounding profile is a dev build.
+[profile.dev.package.openh264-sys2]
+opt-level = 3
+[profile.dev.package.jpeg-encoder]
+opt-level = 3

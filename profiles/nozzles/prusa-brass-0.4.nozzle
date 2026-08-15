@@ -1,0 +1,32 @@
+# Stock nozzle of the MK4 generation; the CORE One family ships CHT brass
+# instead, so on your machines this is the aftermarket baseline.
+name = Prusa Nozzle brass 0.4
+vendor = prusa
+tip = brass
+diameter = 0.4
+high_flow = 0
+abrasive_ok = 0
+preset_variant = 0.4
+retract = 0.7
+retract_speed = 45
+default_layer_h = 0.2
+default_width = 0.45
+default_speed_external = 170
+default_speed_perimeter = 170
+default_speed_infill = 200
+default_speed_travel = 350
+claim_mvs_pla = 16
+claim_mvs_petg = 20
+claim_mvs_asa = 18
+note = [sourced] Flow claims: E3D Nextruder nozzle datasheet (standard brass
+note = table; PLA 220C / PETG 240C / ASA 260C), e3d-online.com/pages/
+note = prusa-nextrduder-nozzle-datasheet (URL misspelling is theirs).
+note = [independent] investegate.de XL bench (Sunlu PLA Meta, 200C):
+note = underextrusion-free to 22, saturation ~24. High-speed-PLA-specific:
+note = it neither validates nor refutes E3D's regular-PLA 16 (which
+note = back-scales to ~13 at 200C by the ~1%/C rule) -- different melt.
+note = [independent] MK4 forum click-ladder (Prusament PLA): click onset 18 /
+note = 20 / 22 mm3/s at 220 / 230 / 240 C; PETG click 27-28 but a
+note = quality-based ceiling near 17 -- click onset is an upper bound, not a
+note = printable ceiling. Retract/speeds: bundle 2.5.5 printer + default
+note = quality print presets (claims, not measurements).

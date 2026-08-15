@@ -1,0 +1,27 @@
+# The independent data's headline: standard ObXidian is the WORST flow
+# performer measured -- below plain brass on the same machine.
+name = Prusa Nozzle ObXidian 0.4
+vendor = prusa
+tip = obxidian
+diameter = 0.4
+high_flow = 0
+abrasive_ok = 1
+preset_variant = 0.4
+retract = 0.7
+retract_speed = 45
+default_layer_h = 0.2
+default_width = 0.45
+default_speed_external = 170
+default_speed_perimeter = 170
+default_speed_infill = 200
+default_speed_travel = 350
+claim_mvs_pla = 15
+claim_mvs_petg = 18
+claim_mvs_asa = 18
+note = [sourced] E3D ObXidian Nextruder datasheet (PLA 220C / PETG 240C /
+note = ASA 260C), e3d-online.com/pages/prusa-nextrduder-nozzle-datasheet.
+note = [independent] investegate.de XL bench (Sunlu PLA Meta, 200C):
+note = underextrusion-free only to 20, peak ~21.9 -- ~2 mm3/s WORSE than
+note = plain brass in the same test. Hardened-and-coated is not free.
+note = [sourced] WS2 corrosion-resistant coating; Prusa warns against cold
+note = pulls (coating damage), help.prusa3d.com nozzle-types article.

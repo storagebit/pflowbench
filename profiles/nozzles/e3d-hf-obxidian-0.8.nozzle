@@ -1,0 +1,28 @@
+# Sold in 0.8 -- but E3D's flow table stops at 0.6. Nobody, E3D included,
+# has published what an HF ObXidian 0.8 can actually do.
+name = E3D High Flow ObXidian 0.8
+vendor = e3d
+tip = obxidian
+diameter = 0.8
+high_flow = 1
+abrasive_ok = 1
+preset_variant = HF0.8
+retract = 0.6
+retract_speed = 25
+default_layer_h = 0.4
+default_width = 0.9
+default_speed_external = 50
+default_speed_perimeter = 70
+default_speed_infill = 100
+default_speed_travel = 350
+claim_mvs_pla = 35
+claim_mvs_petg = 36
+claim_mvs_abs = 36
+claim_mvs_pc = 36
+claim_mvs_pa = 20
+note = [sourced] NO E3D table exists for the 0.8 (support article covers only
+note = 0.4/0.6; verified against the live page). The claim_mvs values are
+note = Prusa bundle HF0.8 preset ceilings (*PLA08HF* 35 / PETG 36 / ABS 36 /
+note = PC 36 / PA 20) -- lowest trust tier, and physics says a melt-bound
+note = ceiling is nearly flat with diameter, making 35-36 at 0.8 suspicious
+note = when the same hardware claims 30-36 at 0.6. Bench before believing.

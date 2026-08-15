@@ -1,0 +1,6 @@
+target/
+runs/
+gcode/
+reference/
+.plkey
+*.gcode

@@ -1,0 +1,37 @@
+# The stock, pre-mounted nozzle on CORE One / CORE One+ / CORE One L --
+# a genuine Bondtech CHT core (Prusa's CORE One L blog says so verbatim).
+# HF is the DEFAULT hardware on these machines, not an upgrade.
+name = Prusa Nozzle brass CHT 0.4
+vendor = prusa
+tip = brass
+diameter = 0.4
+high_flow = 1
+abrasive_ok = 0
+preset_variant = HF0.4
+retract = 0.7
+retract_speed = 45
+default_layer_h = 0.2
+default_width = 0.45
+default_speed_external = 200
+default_speed_perimeter = 150
+default_speed_infill = 150
+default_speed_travel = 350
+claim_mvs_pla = 21
+claim_mvs_petg = 22
+claim_mvs_abs = 25
+claim_mvs_pc = 22
+claim_mvs_pa = 10
+note = [sourced] No manufacturer flow table exists for the CHT brass; the
+note = claim_mvs values above are Prusa's OWN bundle-2.5.5 HF0.4 filament
+note = preset ceilings (*PLAHF* 21 / *PETHF* 22 / ABS 25 / PC 22 / PA 10) --
+note = the lowest trust tier in this database. Prusa markets +45% to +114%
+note = vs standard brass (MK4S announcement) -- UNVERIFIED and inconsistent
+note = with E3D's published HF tables, which top out at +82% (0.6 PLA) and
+note = show only +25-50% at this 0.4 diameter. Plan around +25-33% at 0.4.
+note = [sourced] CHT geometry: filament split into three streams and heated
+note = from the inside (Bondtech patent; help.prusa3d.com). MMU3 use warned
+note = against in the Prusa KB.
+note = [independent] tomshardware.com CORE One review ran Prusament PETG at
+note = 26 mm3/s clean on this nozzle (works-at datapoint, not a ceiling).
+note = [independent] makezine MK4S review: PLA drafts sustained 28-30 mm3/s
+note = (draft quality, no underextrusion metric).
